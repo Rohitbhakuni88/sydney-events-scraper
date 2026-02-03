@@ -3,60 +3,98 @@ const Event = require('./models/Event');
 
 const scrapeEvents = async () => {
   console.log('Starting scraper...');
-  // 1. Launch browser in "Headless: false" mode so you can SEE what happens
-  const browser = await puppeteer.launch({ headless: false }); 
+  const browser = await puppeteer.launch({ 
+    headless: false, 
+    args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+  });
   const page = await browser.newPage();
   
-  // 2. Go to a reliable URL (Sydney.com Events)
-  await page.goto('https://www.sydney.com/events', { waitUntil: 'networkidle2' });
+  // Pretend to be a real user
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-  const events = await page.evaluate(() => {
-    // 3. Find all cards (Try generic class names often used for grids)
-    // We look for items that look like cards
-    const cards = Array.from(document.querySelectorAll('.item-list-item, article, .card')); 
-    
-    return cards.map(card => {
-      // 4. ROBUST SELECTORS: Try multiple things until one works
-      
-      // TITLE: Look for an H3, or H2, or a link with text
-      const titleEl = card.querySelector('h3') || card.querySelector('h2') || card.querySelector('.title');
-      
-      // DATE: Look for a time tag, or specific date classes, or just the first paragraph
-      const dateEl = card.querySelector('time') || card.querySelector('.date') || card.querySelector('p');
+  try {
+    await page.goto('https://www.sydney.com/events', { waitUntil: 'domcontentloaded' });
 
-      // IMAGE: Look for the first image
-      const imgEl = card.querySelector('img');
+    // 1. Scrape the raw data
+    const scrapedEvents = await page.evaluate(() => {
+      const cards = Array.from(document.querySelectorAll('.item-list-item, article, .card')); 
+      return cards.map(card => {
+        const titleEl = card.querySelector('h3') || card.querySelector('h2') || card.querySelector('.title');
+        const dateEl = card.querySelector('time') || card.querySelector('.date') || card.querySelector('p');
+        const imgEl = card.querySelector('img');
+        const linkEl = card.querySelector('a');
 
-      // LINK: Look for the first link
-      const linkEl = card.querySelector('a');
-
-      return {
-        title: titleEl ? titleEl.innerText.trim() : 'Title Not Found',
-        date: dateEl ? dateEl.innerText.trim() : 'Date TBA',
-        venue: 'Sydney, Australia',
-        imageUrl: imgEl ? imgEl.src : '',
-        sourceUrl: linkEl ? linkEl.href : '',
-        city: 'Sydney',
-        status: 'new'
-      };
+        return {
+          title: titleEl ? titleEl.innerText.trim() : null,
+          date: dateEl ? dateEl.innerText.trim() : 'Date TBA',
+          venue: 'Sydney, Australia',
+          imageUrl: imgEl ? imgEl.src : '',
+          sourceUrl: linkEl ? linkEl.href : '',
+          description: 'Automatically scraped event.',
+          city: 'Sydney'
+        };
+      }).filter(e => e.title && e.sourceUrl); // Filter out empty garbage
     });
-  });
 
-  console.log("Scraped Data Check:", events.slice(0, 3)); // See the first 3 results in your terminal
+    console.log(`Found ${scrapedEvents.length} events on page.`);
 
-  await browser.close();
+    // List of URLs seen in THIS scrape
+    const scrapedUrls = scrapedEvents.map(e => e.sourceUrl);
 
-  // Save to DB
-  for (const eventData of events) {
-    // Only save if we actually found a title
-    if (eventData.title !== 'Title Not Found') {
+    // 2. Process each event (New vs Updated)
+    for (const eventData of scrapedEvents) {
       const existing = await Event.findOne({ sourceUrl: eventData.sourceUrl });
+
       if (!existing) {
+        // CASE A: NEW EVENT
+        console.log(`[NEW] ${eventData.title}`);
         await Event.create({ ...eventData, status: 'new' });
+      } else {
+        // CASE B: CHECK FOR UPDATES
+        // Compare key fields to see if anything changed
+        const hasChanged = (
+          existing.title !== eventData.title ||
+          existing.date !== eventData.date ||
+          existing.venue !== eventData.venue
+        );
+
+        if (hasChanged) {
+          console.log(`[UPDATED] ${eventData.title}`);
+          await Event.updateOne(
+            { _id: existing._id }, 
+            { ...eventData, status: 'updated', lastScraped: new Date() }
+          );
+        } else {
+          // No change, just update the timestamp so we know it's still alive
+          await Event.updateOne(
+            { _id: existing._id }, 
+            { lastScraped: new Date() }
+          );
+        }
       }
     }
+
+    // 3. Detect Inactive Events
+    // Find events in DB that were NOT in the list we just scraped
+    const result = await Event.updateMany(
+      { 
+        sourceUrl: { $nin: scrapedUrls }, // URL is NOT in the new list
+        status: { $ne: 'inactive' }       // And it wasn't already inactive
+      },
+      { 
+        $set: { status: 'inactive' } 
+      }
+    );
+
+    if (result.modifiedCount > 0) {
+      console.log(`[INACTIVE] Marked ${result.modifiedCount} old events as inactive.`);
+    }
+
+  } catch (error) {
+    console.error("Scraping Error:", error);
+  } finally {
+    await browser.close();
   }
-  console.log(`Scraped ${events.length} events.`);
 };
 
 module.exports = scrapeEvents;
