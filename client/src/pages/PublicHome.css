@@ -1,0 +1,27 @@
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; margin: 0; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.admin-link { text-decoration: none; color: #555; font-weight: bold; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+
+.card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: transform 0.2s; }
+.card:hover { transform: translateY(-5px); }
+
+.card-image { height: 160px; background-size: cover; background-position: center; }
+
+.content { padding: 20px; }
+.content h3 { margin: 0 0 10px 0; font-size: 1.2rem; color: #333; }
+.date { color: #e63946; font-weight: bold; font-size: 0.9rem; }
+.venue { color: #666; font-size: 0.9rem; margin-bottom: 15px; }
+
+button { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+button { background-color: #1d3557; color: white; }
+button:hover { background-color: #457b9d; }
+
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
+.modal-content input[type="email"] { width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #ddd; border-radius: 6px; }
+.consent { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; font-size: 0.9rem; }
+.close-btn { background-color: transparent; color: #555; margin-top: 10px; }
+.close-btn:hover { background-color: #eee; color: #333; }
