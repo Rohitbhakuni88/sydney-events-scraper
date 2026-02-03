@@ -14,7 +14,8 @@ const PublicHome = () => {
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/events');
+      // UPDATED: Now pointing to your live Render Backend
+      const res = await axios.get('https://sydney-events-scraper.onrender.com/api/events');
       setEvents(res.data);
     } catch (err) {
       console.error("Error fetching events:", err);
@@ -30,7 +31,8 @@ const PublicHome = () => {
     if (!email) return alert('Email required');
     
     try {
-      await axios.post('http://localhost:5000/api/tickets', { 
+      // UPDATED: Now pointing to your live Render Backend
+      await axios.post('https://sydney-events-scraper.onrender.com/api/tickets', { 
         email, 
         eventId: selectedEvent._id 
       });
